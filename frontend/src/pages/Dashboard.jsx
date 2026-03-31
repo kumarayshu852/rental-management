@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import BASE_URL from "../api/api";
 
@@ -15,13 +15,15 @@ function Dashboard() {
   const [billHistory, setBillHistory] = useState([]);
   const [loadingData, setLoadingData] = useState(false);
   const [approvingId, setApprovingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const [milkData, setMilkData] = useState({ date: "", liter: null });
   const [bill, setBill] = useState({
-    month: "", electricityBill: "", electricityRate: "", milkRate: "", rent: "",
-    miscExpense: "", miscNote: ""
+    month: "", electricityBill: "", electricityRate: "",
+    milkRate: "", rent: "", miscExpense: "", miscNote: ""
   });
 
+  // ✅ Tenants ek baar fetch ho — cache mein raho
   useEffect(() => { fetchTenants(); }, []);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ function Dashboard() {
     } catch { showMessage("Tenants load nahi hue", "error"); }
   };
 
-  const fetchMilkHistory = async () => {
+  const fetchMilkHistory = useCallback(async () => {
     setLoadingData(true);
     try {
       const res = await fetch(`${BASE_URL}/milkentry/user/${selectedUser}`, {
@@ -51,9 +53,9 @@ function Dashboard() {
       setMilkHistory(data.sort((a, b) => new Date(b.date) - new Date(a.date)));
     } catch { showMessage("Milk history load nahi hui", "error"); }
     setLoadingData(false);
-  };
+  }, [selectedUser, token]);
 
-  const fetchBillHistory = async () => {
+  const fetchBillHistory = useCallback(async () => {
     setLoadingData(true);
     try {
       const res = await fetch(`${BASE_URL}/bill/user/${selectedUser}`, {
@@ -63,21 +65,19 @@ function Dashboard() {
       setBillHistory(data.sort((a, b) => b.month.localeCompare(a.month)));
     } catch { showMessage("Bill history load nahi hui", "error"); }
     setLoadingData(false);
-  };
+  }, [selectedUser, token]);
 
   const showMessage = (text, type = "success") => {
     setMessage({ text, type });
-    setTimeout(() => setMessage({ text: "", type: "" }), 5000);
+    setTimeout(() => setMessage({ text: "", type: "" }), 4000);
   };
 
   const handleLogout = () => { localStorage.clear(); navigate("/"); };
 
   const handleMilkSubmit = async () => {
     if (!selectedUser) return alert("Pehle tenant select karo!");
-    if (!milkData.date) return alert("Date select karo!");
-    if (milkData.liter === null) return alert("Milk amount select karo — Nahi liya ya kitna liya!");
-
-    const isPresent = milkData.liter > 0;
+    if (!milkData.date) return alert("Select Date !");
+    if (milkData.liter === null) return alert(" Select Milk amount!");
 
     const res = await fetch(`${BASE_URL}/milkentry/add`, {
       method: "POST",
@@ -85,7 +85,7 @@ function Dashboard() {
       body: JSON.stringify({
         userId: selectedUser,
         date: milkData.date,
-        isPresent,
+        isPresent: milkData.liter > 0,
         liter: milkData.liter
       })
     });
@@ -100,8 +100,8 @@ function Dashboard() {
   };
 
   const handleBillSubmit = async () => {
-    if (!selectedUser) return alert("Pehle tenant select karo!");
-    if (!bill.month) return alert("Month select karo!");
+    if (!selectedUser) return alert("firstly select your tenant !");
+    if (!bill.month) return alert("Choose the Month!");
     const res = await fetch(`${BASE_URL}/bill/add`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -109,7 +109,7 @@ function Dashboard() {
     });
     const result = await res.json();
     if (res.ok) {
-      showMessage(`✅ Bill bana! Total: ₹${result.totalAmount} | Milk: ${result.milkLiters}L`, "success");
+      showMessage(`✅ Your Bill is ready! Total: ₹${result.totalAmount} | Milk: ${result.milkLiters}L`, "success");
       setBill({ month: "", electricityBill: "", electricityRate: "", milkRate: "", rent: "", miscExpense: "", miscNote: "" });
       fetchBillHistory();
     } else {
@@ -118,7 +118,7 @@ function Dashboard() {
   };
 
   const handleApprove = async (billId) => {
-    if (!window.confirm("Is bill ko paid mark karna hai?")) return;
+    if (!window.confirm("This bill needs to be marked paid.?")) return;
     setApprovingId(billId);
     try {
       const res = await fetch(`${BASE_URL}/bill/approve/${billId}`, {
@@ -127,13 +127,55 @@ function Dashboard() {
       });
       const result = await res.json();
       if (res.ok) {
-        showMessage("✅ Payment approved! Tenant ko paid mark ho gaya.", "success");
-        fetchBillHistory();
+        showMessage("✅ Payment approved!", "success");
+        // ✅ Sirf us bill ko update karo — dobara fetch mat karo
+        setBillHistory(prev => prev.map(b =>
+          b._id === billId ? { ...b, isPaid: true, paidAt: new Date() } : b
+        ));
       } else {
         showMessage("❌ " + result.message, "error");
       }
     } catch { showMessage("❌ Server error", "error"); }
     setApprovingId(null);
+  };
+
+  // ✅ NAYA — Milk delete
+  const handleMilkDelete = async (milkId) => {
+    if (!window.confirm("This milk entry is to be deleted?")) return;
+    setDeletingId(milkId);
+    try {
+      const res = await fetch(`${BASE_URL}/milkentry/delete/${milkId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showMessage("✅ Milk entry deleted!", "success");
+        // ✅ State se hata do — dobara fetch nahi
+        setMilkHistory(prev => prev.filter(m => m._id !== milkId));
+      } else {
+        showMessage("❌ not deleted", "error");
+      }
+    } catch { showMessage("❌ Server error", "error"); }
+    setDeletingId(null);
+  };
+
+  // ✅ NAYA — Bill delete
+  const handleBillDelete = async (billId) => {
+    if (!window.confirm("Do you want to delete this bill? It won't come back!")) return;
+    setDeletingId(billId);
+    try {
+      const res = await fetch(`${BASE_URL}/bill/delete/${billId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        showMessage("✅ Bill deleted!", "success");
+        setBillHistory(prev => prev.filter(b => b._id !== billId));
+      } else {
+        showMessage("❌ Not deleted", "error");
+      }
+    } catch { showMessage("❌ Server error", "error"); }
+    setDeletingId(null);
   };
 
   const milkPresent = milkHistory.filter(m => m.isPresent).length;
@@ -157,9 +199,9 @@ function Dashboard() {
 
       <div style={s.body}>
         <div style={s.card}>
-          <div style={s.cardTitle}>👤 Tenant Select Karo</div>
+          <div style={s.cardTitle}>👤 Select the Tenant </div>
           <select style={s.select} value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}>
-            <option value="">-- Tenant Chuno --</option>
+            <option value="">-- choose the Tenant --</option>
             {tenants.map(t => (
               <option key={t._id} value={t._id}>{t.name} — {t.email}</option>
             ))}
@@ -185,6 +227,7 @@ function Dashboard() {
           ))}
         </div>
 
+        {/* ===== MILK TAB ===== */}
         {activeTab === "milk" && (
           <>
             {selectedUser && milkHistory.length > 0 && (
@@ -203,33 +246,22 @@ function Dashboard() {
                 </div>
               </div>
             )}
+
             <div style={s.card}>
-              <div style={s.cardTitle}>🥛 Naya Milk Entry</div>
+              <div style={s.cardTitle}>🥛 New Milk Entry</div>
               <label style={s.label}>Date:</label>
               <input style={s.input} type="date" value={milkData.date}
                 onChange={(e) => setMilkData({ ...milkData, date: e.target.value })} />
-              <label style={s.label}>Kitna Milk Liya?</label>
+              <label style={s.label}>How much milk did you take?</label>
               <div style={s.milkBtns}>
                 {[0, 1, 1.5, 2].map(l => (
-                  <button
-                    key={l}
-                    style={{
-                      ...s.milkBtn,
-                      background: milkData.liter === l ? (l === 0 ? "#ef4444" : "#4f46e5") : "white",
-                      color: milkData.liter === l ? "white" : "#475569",
-                      borderColor: milkData.liter === l ? (l === 0 ? "#ef4444" : "#4f46e5") : "#e2e8f0",
-                    }}
-                    onClick={() => setMilkData({ ...milkData, liter: l })}
-                  >
-                    {l === 0 ? "❌ Nahi" : `🥛 ${l}L`}
+                  <button key={l}
+                    style={{ ...s.milkBtn, background: milkData.liter === l ? (l === 0 ? "#ef4444" : "#4f46e5") : "white", color: milkData.liter === l ? "white" : "#475569", borderColor: milkData.liter === l ? (l === 0 ? "#ef4444" : "#4f46e5") : "#e2e8f0" }}
+                    onClick={() => setMilkData({ ...milkData, liter: l })}>
+                    {l === 0 ? "❌ Skipped" : `🥛 ${l}L`}
                   </button>
                 ))}
               </div>
-              {milkData.liter === null && (
-                <div style={{ fontSize: "12px", color: "#f59e0b", fontWeight: 600 }}>
-                  ⚠️ Upar se ek option select karo
-                </div>
-              )}
               <button style={s.btn} onClick={handleMilkSubmit}>Save Entry</button>
             </div>
 
@@ -237,19 +269,31 @@ function Dashboard() {
               <div style={s.card}>
                 <div style={s.cardTitle}>📋 Milk History</div>
                 {loadingData ? <div style={s.loading}>Loading...</div>
-                  : milkHistory.length === 0 ? <div style={s.empty}>Koi entry nahi mili</div>
+                  : milkHistory.length === 0 ? <div style={s.empty}>No entry found</div>
                   : (
                     <div style={s.tableWrap}>
                       <table style={s.table}>
                         <thead><tr style={s.thead}>
-                          <th style={s.th}>Date</th><th style={s.th}>Status</th><th style={s.th}>Liter</th>
+                          <th style={s.th}>Date</th>
+                          <th style={s.th}>Status</th>
+                          <th style={s.th}>Liter</th>
+                          <th style={s.th}>Delete</th>
                         </tr></thead>
                         <tbody>
                           {milkHistory.map((m, i) => (
                             <tr key={m._id} style={i % 2 === 0 ? s.trEven : s.trOdd}>
                               <td style={s.td}>{new Date(m.date).toLocaleDateString("en-IN")}</td>
-                              <td style={s.td}><span style={m.isPresent ? s.badgeGreen : s.badgeRed}>{m.isPresent ? "✅ Liya" : "❌ Nahi"}</span></td>
+                              <td style={s.td}><span style={m.isPresent ? s.badgeGreen : s.badgeRed}>{m.isPresent ? "✅ Taken" : "❌ Skipped"}</span></td>
                               <td style={s.td}>{m.liter}L</td>
+                              <td style={s.td}>
+                                <button
+                                  style={{ ...s.deleteBtn, opacity: deletingId === m._id ? 0.5 : 1 }}
+                                  onClick={() => handleMilkDelete(m._id)}
+                                  disabled={deletingId === m._id}
+                                >
+                                  {deletingId === m._id ? "..." : "🗑️"}
+                                </button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -261,6 +305,7 @@ function Dashboard() {
           </>
         )}
 
+        {/* ===== BILL TAB ===== */}
         {activeTab === "bill" && (
           <>
             {selectedUser && billHistory.length > 0 && (
@@ -271,7 +316,7 @@ function Dashboard() {
                 </div>
                 <div style={{ ...s.statBox, background: "#fef9c3" }}>
                   <div style={{ ...s.statNum, color: "#b45309" }}>₹{totalBilled.toLocaleString("en-IN")}</div>
-                  <div style={s.statLabel}>💰 Kul Amount</div>
+                  <div style={s.statLabel}>💰 Total Amount</div>
                 </div>
                 <div style={{ ...s.statBox, background: pendingBills > 0 ? "#fef2f2" : "#f0fdf4" }}>
                   <div style={{ ...s.statNum, color: pendingBills > 0 ? "#dc2626" : "#16a34a" }}>{pendingBills}</div>
@@ -281,30 +326,30 @@ function Dashboard() {
             )}
 
             <div style={s.card}>
-              <div style={s.cardTitle}>🧾 Naya Bill Banao</div>
-              <div style={s.infoBox}>ℹ️ Bill generate hone par us month ki milk automatically calculate hogi</div>
+              <div style={s.cardTitle}>🧾 New Bill generated</div>
+              <div style={s.infoBox}>ℹ️ Once the bill is generated, the milk for that month will be automatically calculated.</div>
               <label style={s.label}>Month:</label>
               <input style={s.input} type="month" value={bill.month}
                 onChange={(e) => setBill({ ...bill, month: e.target.value })} />
-              <label style={s.label}>Bijli Units:</label>
-              <input style={s.input} type="number" placeholder="Jaise: 65" value={bill.electricityBill}
+              <label style={s.label}>Electricity Units:</label>
+              <input style={s.input} type="number" placeholder="As: 65" value={bill.electricityBill}
                 onChange={(e) => setBill({ ...bill, electricityBill: e.target.value })} />
-              <label style={s.label}>Bijli Rate (₹/unit):</label>
-              <input style={s.input} type="number" placeholder="Jaise: 7" value={bill.electricityRate}
+              <label style={s.label}>Electricity Rate (₹/unit):</label>
+              <input style={s.input} type="number" placeholder="As: 7" value={bill.electricityRate}
                 onChange={(e) => setBill({ ...bill, electricityRate: e.target.value })} />
               <label style={s.label}>Milk Rate (₹/liter):</label>
-              <input style={s.input} type="number" placeholder="Jaise: 60" value={bill.milkRate}
+              <input style={s.input} type="number" placeholder="As: 60" value={bill.milkRate}
                 onChange={(e) => setBill({ ...bill, milkRate: e.target.value })} />
               <label style={s.label}>Rent (₹):</label>
-              <input style={s.input} type="number" placeholder="Jaise: 5000" value={bill.rent}
+              <input style={s.input} type="number" placeholder="As: 5000" value={bill.rent}
                 onChange={(e) => setBill({ ...bill, rent: e.target.value })} />
               <label style={s.label}>Miscellaneous (₹) — Optional:</label>
-              <input style={s.input} type="number" placeholder="Jaise: 200 (chhod sakte ho)" value={bill.miscExpense}
+              <input style={s.input} type="number" placeholder="As: 0" value={bill.miscExpense}
                 onChange={(e) => setBill({ ...bill, miscExpense: e.target.value })} />
               {bill.miscExpense && Number(bill.miscExpense) > 0 && (
                 <>
-                  <label style={s.label}>Misc ka reason (optional):</label>
-                  <input style={s.input} type="text" placeholder="Jaise: Paani ka bill, Repair..." value={bill.miscNote}
+                  <label style={s.label}>Misc  reason:</label>
+                  <input style={s.input} type="text" placeholder="As: Water bill, repairs..." value={bill.miscNote}
                     onChange={(e) => setBill({ ...bill, miscNote: e.target.value })} />
                 </>
               )}
@@ -315,7 +360,7 @@ function Dashboard() {
               <div style={s.card}>
                 <div style={s.cardTitle}>📋 Bill History</div>
                 {loadingData ? <div style={s.loading}>Loading...</div>
-                  : billHistory.length === 0 ? <div style={s.empty}>Koi bill nahi mila</div>
+                  : billHistory.length === 0 ? <div style={s.empty}>No bill received</div>
                   : (
                     <div style={s.billCards}>
                       {billHistory.map((b) => (
@@ -327,7 +372,18 @@ function Dashboard() {
                                 {b.isPaid ? "✅ Paid" : "⏳ Pending"}
                               </span>
                             </div>
-                            <span style={s.billTotal}>₹{b.totalAmount.toLocaleString("en-IN")}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                              <span style={s.billTotal}>₹{b.totalAmount.toLocaleString("en-IN")}</span>
+                              {/* ✅ DELETE BUTTON */}
+                              <button
+                                style={{ ...s.deleteBtn, opacity: deletingId === b._id ? 0.5 : 1 }}
+                                onClick={() => handleBillDelete(b._id)}
+                                disabled={deletingId === b._id}
+                                title="Bill delete karo"
+                              >
+                                {deletingId === b._id ? "..." : "🗑️"}
+                              </button>
+                            </div>
                           </div>
                           <div style={s.billCardBody}>
                             <span>⚡ ₹{(b.electricityBill * b.electricityRate).toLocaleString("en-IN")}</span>
@@ -404,7 +460,7 @@ const s = {
   badgeGreen: { background: "#dcfce7", color: "#16a34a", padding: "3px 8px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 },
   badgeRed: { background: "#fee2e2", color: "#dc2626", padding: "3px 8px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 },
   milkBtns: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px" },
-  milkBtn: { padding: "10px 6px", borderRadius: "8px", border: "1.5px solid", cursor: "pointer", fontSize: "13px", fontWeight: 600, transition: "all 0.15s" },
+  milkBtn: { padding: "10px 6px", borderRadius: "8px", border: "1.5px solid", cursor: "pointer", fontSize: "13px", fontWeight: 600 },
   billCards: { display: "flex", flexDirection: "column", gap: "12px" },
   billCard: { border: "1px solid #e2e8f0", borderRadius: "12px", overflow: "hidden" },
   billCardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 14px", background: "#f8fafc" },
@@ -415,7 +471,9 @@ const s = {
   approveBtn: { width: "100%", padding: "10px", background: "#16a34a", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: 600, fontSize: "14px" },
   paidBadge: { background: "#dcfce7", color: "#16a34a", padding: "3px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 },
   pendingBadge: { background: "#fef9c3", color: "#b45309", padding: "3px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: 600 },
-  paidInfo: { padding: "8px 14px", fontSize: "12px", color: "#16a34a", background: "#f0fdf4", fontWeight: 500 }
+  paidInfo: { padding: "8px 14px", fontSize: "12px", color: "#16a34a", background: "#f0fdf4", fontWeight: 500 },
+  // ✅ NAYA DELETE BUTTON
+  deleteBtn: { background: "#fef2f2", color: "#dc2626", border: "1px solid #fca5a5", borderRadius: "6px", padding: "4px 8px", cursor: "pointer", fontSize: "14px", fontWeight: 600 }
 };
 
 export default Dashboard;

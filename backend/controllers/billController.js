@@ -117,6 +117,18 @@ export const approveBill = async (req, res) => {
   }
 };
 
+// ✅ NAYA — Bill delete
+export const deleteBill = async (req, res) => {
+  try {
+    const bill = await Bill.findById(req.params.billId);
+    if (!bill) return res.status(404).json({ message: "Bill nahi mila" });
+    await Bill.findByIdAndDelete(req.params.billId);
+    res.json({ message: "Bill delete ho gaya ✅" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // ✅ PURANE DUPLICATE BILLS DELETE — ek baar chalao
 // GET /api/bill/fix-duplicates
 export const fixDuplicateBills = async (req, res) => {

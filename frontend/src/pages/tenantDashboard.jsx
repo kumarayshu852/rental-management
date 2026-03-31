@@ -67,12 +67,12 @@ function TenantDashboard() {
       </div>
 
       <div style={s.body}>
-        <div style={s.pageTitle}>🏠 Mera Dashboard</div>
+        <div style={s.pageTitle}>🏠 Your Dashboard</div>
 
         {loading ? (
           <div style={s.loadingBox}>
             <div style={s.spinnerWrap}><div style={s.spinner}></div></div>
-            <p style={{ color: "#94a3b8" }}>Data load ho raha hai...</p>
+            <p style={{ color: "#94a3b8" }}>Loading Your Data...</p>
           </div>
         ) : (
           <>
@@ -81,14 +81,14 @@ function TenantDashboard() {
               <div style={{ ...s.summCard, background: "linear-gradient(135deg, #dc2626, #b91c1c)" }}>
                 <div style={s.summIcon}>⏳</div>
                 <div style={s.summVal}>₹{pendingAmount.toLocaleString("en-IN")}</div>
-                <div style={s.summLabel}>Baaki Pending</div>
+                <div style={s.summLabel}>Remaining pending</div>
                 <div style={s.summSub}>{billHistory.filter(b => !b.isPaid).length} bills</div>
               </div>
               <div style={{ ...s.summCard, background: "linear-gradient(135deg, #0ea5e9, #0284c7)" }}>
                 <div style={s.summIcon}>🥛</div>
                 <div style={s.summVal}>{thisMonthLiters}L</div>
-                <div style={s.summLabel}>Is Mahine Milk</div>
-                <div style={s.summSub}>{thisMonthMilk.length} din</div>
+                <div style={s.summLabel}>Milk this month</div>
+                <div style={s.summSub}>{thisMonthMilk.length} days</div>
               </div>
               <div style={{ ...s.summCard, background: "linear-gradient(135deg, #10b981, #059669)" }}>
                 <div style={s.summIcon}>✅</div>
@@ -102,14 +102,14 @@ function TenantDashboard() {
             {latestBill && (
               <div style={{ ...s.billDetail, borderLeft: `4px solid ${latestBill.isPaid ? "#16a34a" : "#f59e0b"}` }}>
                 <div style={s.bdHeader}>
-                  <span style={s.bdTitle}>📋 Aakhri Bill — {latestBill.month}</span>
+                  <span style={s.bdTitle}>📋 Latest Bill — {latestBill.month}</span>
                   <span style={latestBill.isPaid ? s.paidBig : s.pendingBig}>
                     {latestBill.isPaid ? "✅ Paid" : "⏳ Pending"}
                   </span>
                 </div>
                 <div style={s.bdRows}>
                   <div style={s.bdRow}>
-                    <span style={s.bdKey}>⚡ Bijli ({latestBill.electricityBill} units × ₹{latestBill.electricityRate})</span>
+                    <span style={s.bdKey}>⚡ Electricity ({latestBill.electricityBill} units × ₹{latestBill.electricityRate})</span>
                     <span style={s.bdVal}>₹{(latestBill.electricityBill * latestBill.electricityRate).toLocaleString("en-IN")}</span>
                   </div>
                   <div style={s.bdRow}>
@@ -117,7 +117,7 @@ function TenantDashboard() {
                     <span style={s.bdVal}>₹{(latestBill.milkLiters * latestBill.milkRate).toLocaleString("en-IN")}</span>
                   </div>
                   <div style={s.bdRow}>
-                    <span style={s.bdKey}>🏠 Kiraya</span>
+                    <span style={s.bdKey}>🏠 Room Rent</span>
                     <span style={s.bdVal}>₹{latestBill.rent.toLocaleString("en-IN")}</span>
                   </div>
                   {latestBill.miscExpense > 0 && (
@@ -138,7 +138,7 @@ function TenantDashboard() {
                 )}
                 {!latestBill.isPaid && (
                   <div style={s.pendingNote}>
-                    ⚠️ Yeh bill abhi admin se approve nahi hua hai
+                    ⚠️ This bill has not yet been approved by the administrator. Please wait for the approval of administrator. If it's taking too Long then contact Your administrator. and Thank you for Your Patience. 
                   </div>
                 )}
               </div>
@@ -147,7 +147,7 @@ function TenantDashboard() {
             {/* Tabs */}
             <div style={s.tabs}>
               <button style={activeTab === "bills" ? s.activeTab : s.tab} onClick={() => setActiveTab("bills")}>
-                🧾 Sab Bills
+                🧾 Total Bills
               </button>
               <button style={activeTab === "milk" ? s.activeTab : s.tab} onClick={() => setActiveTab("milk")}>
                 🥛 Milk History
@@ -162,7 +162,7 @@ function TenantDashboard() {
                   <span style={s.cardBadge}>{billHistory.length} bills</span>
                 </div>
                 {billHistory.length === 0 ? (
-                  <div style={s.empty}>Abhi koi bill nahi</div>
+                  <div style={s.empty}>No bill yet</div>
                 ) : (
                   <div style={s.billCards}>
                     {billHistory.map((b) => (
@@ -206,15 +206,15 @@ function TenantDashboard() {
                   <span style={s.cardBadge}>{totalLiters}L total</span>
                 </div>
                 {milkHistory.length === 0 ? (
-                  <div style={s.empty}>Abhi koi milk entry nahi</div>
+                  <div style={s.empty}>No milk entries yet</div>
                 ) : (
                   <div style={s.tableWrap}>
                     <table style={s.table}>
                       <thead>
                         <tr style={s.thead}>
-                          <th style={s.th}>Tarikh</th>
+                          <th style={s.th}>Date</th>
                           <th style={s.th}>Status</th>
-                          <th style={s.th}>Liter</th>
+                          <th style={s.th}>Liters</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -223,7 +223,7 @@ function TenantDashboard() {
                             <td style={s.td}>{new Date(m.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
                             <td style={s.td}>
                               <span style={m.isPresent ? s.badgeGreen : s.badgeRed}>
-                                {m.isPresent ? "✅ Liya" : "❌ Nahi"}
+                                {m.isPresent ? "✅ Taken" : "❌ Skipped"}
                               </span>
                             </td>
                             <td style={s.td}>{m.liter}L</td>
