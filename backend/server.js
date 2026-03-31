@@ -10,14 +10,18 @@ import milkRoutes from "./routes/milkRoutes.js";
 dotenv.config();
 
 const app = express();
-app.use(express.json());
-// server.js mein cors update karo
+
+// ✅ CORS PEHLE AANA CHAHIYE — bilkul upar
 app.use(cors({
   origin: [
-    "http://localhost:5173",                        // local development
-    "https://rental-management-woad-five.vercel.app"       // ← tera Vercel URL daalo
-  ]
+    "http://localhost:5173",
+    "https://rental-management-woad-five.vercel.app"
+  ],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
+app.use(express.json());
 
 connectDB();
 
