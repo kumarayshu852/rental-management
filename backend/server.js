@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(cors({
   origin: [
     "http://localhost:5173",                        // local development
-            // ← tera Vercel URL daalo
+    "https://rental-management-woad-five.vercel.app"       // ← tera Vercel URL daalo
   ]
 }));
 

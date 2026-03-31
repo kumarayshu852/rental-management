@@ -1,3 +1,4 @@
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://rental-management-9f5z.onrender.com/api";
+
 
 export default BASE_URL;
