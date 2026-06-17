@@ -18,6 +18,7 @@
     "jsonwebtoken": "^9.0.3",
     "mogoose": "^0.0.1-security",
     "mongoose": "^9.3.3",
+    "node-cron": "^4.2.1",
     "nodemon": "^3.1.14"
   }
 }

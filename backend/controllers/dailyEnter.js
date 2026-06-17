@@ -38,7 +38,7 @@ export const deleteMilkEntry = async (req, res) => {
   try {
     const { id } = req.params;
     await Milk.findByIdAndDelete(id);
-    res.json({ message: "Milk entry delete ho gayi ✅" });
+    res.json({ message: "Milk entry has been deleted ✅" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

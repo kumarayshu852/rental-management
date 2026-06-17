@@ -14,7 +14,7 @@ export const addBill = async (req, res) => {
     const existingBill = await Bill.findOne({ userId, month });
     if (existingBill) {
       return res.status(400).json({
-        message: `${month} ka bill pehle se bana hua hai! Duplicate nahi ban sakta.`,
+        message: `${month} The bill has already been created! It cannot be duplicated.`,
         existingBill
       });
     }
@@ -26,9 +26,8 @@ export const addBill = async (req, res) => {
     // ✅ TIMEZONE-SAFE DATE RANGE
     // ISO string use karo taaki UTC boundary sahi rahe
     // Month ki pehli din 00:00:00 UTC
-    const startDate = new Date(`${year}-${String(m).padStart(2, "0")}-01T00:00:00.000Z`);
-    // Agli month ki pehli din — yani is month ki aakhri millisecond tak
-    const endDate = new Date(Date.UTC(y, m, 1, 0, 0, 0, 0)); // next month 1st, midnight UTC
+    const startDate = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(y, m, 1, 0, 0, 0, 0));
 
     // Electricity
     const electricity = Number(electricityBill) * Number(electricityRate);
@@ -70,7 +69,7 @@ export const addBill = async (req, res) => {
   } catch (error) {
     if (error.code === 11000) {
       return res.status(400).json({
-        message: "Is month ka bill pehle se bana hua hai! Duplicate nahi ban sakta."
+        message: "The bill for this month has already been created! It cannot be duplicated."
       });
     }
     console.log(error);
@@ -104,14 +103,14 @@ export const getAllBills = async (req, res) => {
 export const approveBill = async (req, res) => {
   try {
     const bill = await Bill.findById(req.params.billId);
-    if (!bill) return res.status(404).json({ message: "Bill nahi mila" });
-    if (bill.isPaid) return res.status(400).json({ message: "Yeh bill pehle se paid hai" });
+    if (!bill) return res.status(404).json({ message: "Bill not found," });
+    if (bill.isPaid) return res.status(400).json({ message: "This bill is already paid" });
 
     bill.isPaid = true;
     bill.paidAt = new Date();
     await bill.save();
 
-    res.json({ message: "Bill paid mark ho gaya ✅", bill });
+    res.json({ message: "Bill marked as paid", bill });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -121,9 +120,9 @@ export const approveBill = async (req, res) => {
 export const deleteBill = async (req, res) => {
   try {
     const bill = await Bill.findById(req.params.billId);
-    if (!bill) return res.status(404).json({ message: "Bill nahi mila" });
+    if (!bill) return res.status(404).json({ message: "Bill not found" });
     await Bill.findByIdAndDelete(req.params.billId);
-    res.json({ message: "Bill delete ho gaya ✅" });
+    res.json({ message: "Bill has been deleted " });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -161,10 +160,27 @@ export const fixDuplicateBills = async (req, res) => {
     }
 
     res.json({
-      message: `✅ ${toDelete.length} duplicate bills delete ho gaye`,
+      message: `✅ ${toDelete.length} Duplicate bills have been deleted.`,
       deleted: toDelete.length,
       remaining: allBills.length - toDelete.length
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ NAYA — Overdue bills nikalo (5+ din se pending)
+export const getOverdueBills = async (req, res) => {
+  try {
+    const fiveDaysAgo = new Date();
+    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 1);
+
+    const overdueBills = await Bill.find({
+      isPaid: false,
+      createdAt: { $lte: fiveDaysAgo }
+    }).populate("userId", "name email phone");
+
+    res.json(overdueBills);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

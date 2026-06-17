@@ -6,6 +6,7 @@ import billRoutes from './routes/billRoutes.js';
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from './routes/userRoutes.js';
 import milkRoutes from "./routes/milkRoutes.js";
+import { startReminderCron } from "./cron/reminderCron.js";
 
 dotenv.config();
 
@@ -24,6 +25,7 @@ app.use(cors({
 app.use(express.json());
 
 connectDB();
+startReminderCron();
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

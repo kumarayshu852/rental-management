@@ -3,9 +3,10 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
 // SIGNUP
+// SIGNUP function mein yeh change karo
 export const signup = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, phone } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -18,6 +19,7 @@ export const signup = async (req, res) => {
       name,
       email,
       password: hashedPassword,
+      phone: phone || "",
       role: role || "tenant"
     });
 
@@ -28,7 +30,6 @@ export const signup = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 // LOGIN
 export const login = async (req, res) => {
   try {
